@@ -1,38 +1,8 @@
 #!/bin/bash
 
-# Retrieve bucket name
-# ./$PROJECT_PATH/dl.cfg
-BUCKET_NAME=project3-data-lake-bucket
-
-# Declare variables
-PROJECT_PATH=~/Documents/DataEngineering/data_lakes/project/files
-BUCKET_PATH=s3://${BUCKET_NAME}/
-CLUSTER_NAME=data-lake-project
-EMR_LABEL=emr-5.28.0
-INSTANCE_COUNT=3
-LOCAL_BOOTSTRAP_PATH=$PROJECT_PATH/bootstrap.sh
-BOOTSTRAP_PATH=s3://${BUCKET_NAME}/resources/bootstrap.sh
-KEY_NAME="spark-cluster"
-INSTANCE_TYPE=m5.xlarge
-JSON_CONFIG=$PROJECT_PATH/configurations.json
-ETL_PY_PATH=$PROJECT_PATH/etl.py
-
-clean_s3_bucket() {
-    # Check to see if S3 exists
-    if aws s3 ls $BUCKET_PATH 2>&1 | grep -q 'NoSuchBucket' -s
-    then
-        echo "S3 bucket doesn't exist."
-    else
-        # Empty S3 Bucket
-        echo "Emptying any existing buckets in S3 with name $2"
-        aws s3 rm $1 --recursive
-
-        echo -e "Deleting any existing buckets in S3 with name $2\n"
-        # Delete S3 Bucket
-        aws s3api delete-bucket --bucket $2
-    fi
-
-}
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+chmod +x $SCRIPT_DIR/cluster_config.sh
+source $SCRIPT_DIR/cluster_config.sh
 
 # Clean S3 buckets if they exist
 clean_s3_bucket $BUCKET_PATH $BUCKET_NAME
@@ -41,7 +11,6 @@ clean_s3_bucket $BUCKET_PATH $BUCKET_NAME
 echo "Creating a new S3 bucket named ${BUCKET_NAME}..."
 aws s3api create-bucket --bucket $BUCKET_NAME --region us-east-2 --create-bucket-configuration LocationConstraint=us-east-2
 echo -e "S3 bucket named ${BUCKET_NAME} created successfully\n"
-
 
 # Copy bootstrap.sh to S3
 echo "Copying boostrap from local to S3..."
@@ -53,7 +22,7 @@ SUBNET_ID=$(aws ec2 describe-subnets --query "Subnets[0].SubnetId")
 
 # Create an EMR cluster
 echo "Creating EMR cluster..."
-aws emr create-cluster --name $CLUSTER_NAME --use-default-roles --release-label $EMR_LABEL --instance-count $INSTANCE_COUNT --applications Name=Spark --bootstrap-actions Path=$BOOTSTRAP_PATH --configurations file://$JSON_CONFIG --ec2-attributes "KeyName=${KEY_NAME},SubnetId=${SUBNET_ID}" --instance-type $INSTANCE_TYPE --profile default
+aws emr create-cluster --name $CLUSTER_NAME --use-default-roles --release-label $EMR_LABEL --instance-count $INSTANCE_COUNT --applications Name=Spark --bootstrap-actions Path=$BOOTSTRAP_PATH --configurations file://$LOCAL_CONFIG_PATH --ec2-attributes "KeyName=${KEY_NAME},SubnetId=${SUBNET_ID}" --instance-type $INSTANCE_TYPE --profile default
 
 # Get Cluster-Id
 CLUSTER_ID=$(aws emr list-clusters --active --query "Clusters[0].Id" --output text)
